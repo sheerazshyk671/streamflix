@@ -2,9 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import "./App.css";
 
-// Free key from https://www.themoviedb.org/settings/api, saved in .env as VITE_TMDB_KEY=yourkey
-const KEY: string | undefined = import.meta.env.VITE_TMDB_KEY;
-const BASE = "https://api.themoviedb.org/3";
+// The TMDB key lives only on the server (api/tmdb.js). The browser calls our own /api/tmdb proxy.
 const IMG = "https://image.tmdb.org/t/p";
 
 interface Movie {
@@ -33,7 +31,7 @@ type Selected = { movie: Movie; play: boolean };
 type OpenFn = (movie: Movie, play: boolean) => void;
 
 async function get<T>(path: string, params = ""): Promise<T> {
-  const res = await fetch(`${BASE}${path}?api_key=${KEY}&language=en-US${params}`);
+  const res = await fetch(`/api/tmdb?path=${encodeURIComponent(path)}&language=en-US${params}`);
   if (!res.ok) throw new Error(`Request failed (${res.status})`);
   return (await res.json()) as T;
 }
@@ -291,9 +289,7 @@ const loadList = (): Movie[] => {
 
 export default function App() {
   const [rows, setRows] = useState<Record<string, Movie[]>>({});
-  const [error, setError] = useState(
-    KEY ? "" : "Add your TMDB key to a .env file as VITE_TMDB_KEY, then restart npm run dev."
-  );
+  const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Movie[] | null>(null);
   const [selected, setSelected] = useState<Selected | null>(null);
@@ -301,14 +297,13 @@ export default function App() {
   const q = useDebounced(query.trim());
 
   useEffect(() => {
-    if (!KEY) return;
     Promise.all(ROWS.map((r) => get<Page>(r.path, r.params)))
       .then((all) => setRows(Object.fromEntries(ROWS.map((r, n) => [r.title, all[n].results]))))
-      .catch((e: Error) => setError(`Could not load movies: ${e.message}. Check your API key and internet.`));
+      .catch((e: Error) => setError(`Could not load movies: ${e.message}. Check the server's TMDB_KEY and your internet.`));
   }, []);
 
   useEffect(() => {
-    if (!q || !KEY) {
+    if (!q) {
       setResults(null);
       return;
     }
